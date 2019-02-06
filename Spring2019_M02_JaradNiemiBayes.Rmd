@@ -1,0 +1,206 @@
+---
+title: "Bayesian analysis in R"
+author: "Jarad Niemi"
+date: "2/6/2019"
+output: html_document
+---
+
+This document provides a summary of topics discussed during the Rgronomist 
+meeting on 1 Feb 2019. The topic of discussion was "Bayesian analysis in R", 
+but this is a huge topic and thus there was no attempt to discuss the topic
+exhaustively. For those interested in a more thorough overview of the packages
+that can perform Bayesian analysis in R, please take a look at the 
+[CRAN Task View: Bayesian Inference](https://cran.r-project.org/web/views/Bayesian.html).
+
+My presentation during the Rgronomist meeting focused on three ideas:
+
+1. Why do you want to do a Bayesian analysis?
+1. If you have ever run a regression analysis, you have done a Bayesian analysis.
+1. If you need to do perform a sophisticated analysis that is not already 
+programmed in an R package, then you will likely want to use a black-box 
+Bayesian package, e.g. JAGS or Stan.
+
+## Why do you want to do a Bayesian analysis?
+
+In my opinion every scientist should be performing a Bayesian analysis because
+it provides the interpretation that the scientist desires. 
+Specifically, the Bayesian approach models belief through the mathematics of
+probability. Thus, using Bayes rule, a Bayesian analysis provides a formal
+mechanism for updating your belief as data acrues. 
+
+In a typical statistics course, you are taught about *p*-values and confidence 
+intervals. Although the instructor is probably careful about what these mean, 
+it is easy to misunderstand and interpret them as a statement about belief. 
+
+### Confidence intervals
+
+We discussed that confidence intervals are constructed to cover the truth the 
+correct proportion of time, on average, across all their uses. 
+A confidence interval tells you nothing about a particular parameter for a 
+particular experiment. But, I think, that a scientist wants to make a statement
+about that particular parameter for that particular experiment. 
+Thus, I don't believe a confidence interval is what a scientist wants.
+
+### *p*-values 
+
+*p*-values are the probability of a test statistics as or more extreme as that
+observed, if the null hypothesis is true. 
+This seems a bit odd since the whole goal, as typically presented, is to 
+determine whether the null hypothesis or alternative hypothesis is true. 
+Actually this is a false dichotomy as it always the case that neither hypothesis
+is true, as George Box said
+
+> All models are wrong but some are useful.
+
+The American Statistics Association recently published a statement on 
+*p*-values: [brief statement](https://www.amstat.org/asa/files/pdfs/p-valuestatement.pdf)
+and [extended statement](https://amstat.tandfonline.com/doi/abs/10.1080/00031305.2016.1154108).
+In this statement, 1 of the six principles indicates what a *p*-value is
+while the other 5 indicate what a *p*-value is not. 
+
+> *p*-values can indicate how incompatible the data are with a specified statistical model. 
+
+The *specified statistical model* is the model associated with the null 
+hypothesis. Thus, the only thing a *p*-value can do is indicate how incompatible
+the data are with this model which says nothing about how likely the alternative
+is. 
+
+One of the other principles says 
+
+> *p*-values do not measure the probability that the studied hypothesis is true.
+
+The *probability* in this statement is actually a statement about belief, 
+i.e. how sure should we be that the null hypothesis is true (or false). 
+As a scientist this is what I think you should want, i.e. updating beliefs 
+based on data. 
+
+To further this idea, I showed a shiny app that aimed at understanding how to 
+interpret *p*-values in terms of how often the null hypothesis is true. 
+Use this code to run the app
+
+```{r, eval=FALSE}
+shiny::runGitHub('jarad/pvalue')
+```
+
+The basic take-away from this app is that the proportion of times the null 
+hypothesis is true when you get a significant *p*-value is much larger than 
+you expect it to be. 
+
+### Posterior probabilities and credible intervals
+
+A Bayesian analysis will produce posterior probabilities for hypotheses and 
+credible intervals for parameters.
+Both of these can be interpreted as an update about your belief given the data
+you have obtained. 
+Thus, I believe that what scientists really want is a Bayesian analysis.
+If you, as a member of Rgronomists are interested in learning more, you should
+take [STAT 444](http://catalog.iastate.edu/azcourses/stat/) which is a 
+graduate course for non-statistics graduate students about Bayesian analysis.
+
+
+
+## Simple Bayesian analyses
+
+There are a number of simple Bayesian analyses that can be done in R.
+In a Bayesian analysis, you following the following steps
+
+1. Assume a model for your data.
+1. Assume a prior distribution for parameters of that model.
+1. Use [Bayes Rule](https://en.wikipedia.org/wiki/Bayes%27_theorem) to calculate the posterior distribution.
+
+For most realistic analyses, the last two steps can be complicated. I will 
+focus on situations where the steps are relatively easy.
+The first will be a binomial model and the second will be a regression model.
+
+### Binomial model
+
+My favorite conjugate analysis is when you have binomial data, 
+i.e. you observe some number of successes out of some number of independent 
+attempts all with the same probability of success,
+and you are interested in making statements about the probability of success.
+
+The conjugate prior for this probability of success is the beta distribution
+which has two parameters: prior number of success and prior number of failures. 
+We used the example of rolling a six-sided foam die and recording a 1 as a 
+success. The consensus (if my memory is correct) was that a beta distribution
+with 100 prior successes and 100 prior failures seemed to represent the 
+uncertainty about the probability of a success (a 1) even before you ever 
+rolled the die.
+
+```{r}
+prior_successes <- 100
+prior_failures <- 500
+curve(dbeta(x, prior_successes, prior_failures), n = 1001,
+      main="Prior `belief' about the probability of rolling a 1")
+```
+
+Now if we roll the die 10 times and get 3 successes,  
+how do you update your beliefs? Bayes rule says that you just add prior 
+successes to the number observed success and add prior failures to the number of
+observed failures. 
+Thus, your posterior is 
+
+```{r}
+number_attempts    <- 10
+observed_successes <- 3
+observed_failures  <- number_attempts - observed_successes
+
+
+curve(dbeta(x, prior_successes, prior_failures), n = 1001,
+      main="Prior and posterior `belief' about the probability of rolling a 1")
+curve(dbeta(x, 
+            prior_successes + observed_successes, 
+            prior_failures + observed_failures), 
+      add=TRUE, col='red')
+```
+
+This situation occurs in many real world scenarios. 
+The easiest to understand is sports, e.g. free-throws in basketball. 
+
+### Regression
+
+Many people indicated they have done a regression analysis in R.
+Well, you have all done a Bayesian analysis in R using the default prior 
+for regression, specifically it is uniform over all coefficients and it is an
+inverse function of the variance. 
+
+```{r}
+n <- 100
+x <- runif(n)
+y <- rnorm(n,x)
+
+m <- lm(y~x)
+summary(m)
+```
+
+With this knowledge, you can interpret the output using a statement about 
+belief. For example, the `Estimate` column is your best guess about the parameters,
+the `Std. Error` is the posterior standard deviation, the `Pr(>|t|)` is a tail
+probability in the posterior, etc.
+
+### Other conjugate analyses with scalar parameters
+
+There are a number of other simple models with analytical solutions. 
+To play around with some of these, take a look at this app
+
+```{r, eval=FALSE}
+shiny::runGitHub('jarad/one_parameter_conjugate')
+```
+
+
+## More complex models
+
+While these simple models are interesting from the perspective of understanding
+how prior information and information from the data come together to form the
+posterior, they are typically not realistic models for interesting data. 
+For realistic models, we need computational tools, e.g. Markov chain Monte Carlo
+(MCMC) and sequential Monte Carlo (SMC).
+
+There are many [R packages that perform Bayesian analyses](https://cran.r-project.org/web/views/Bayesian.html) and 
+which one you choose will mainly depend on what model you are trying to fit. 
+If none of these packages can fit the model you are trying to fit, 
+then you will likely need to use a black-box Bayesian software, 
+e.g. [JAGS](http://mcmc-jags.sourceforge.net/) and [Stan](https://mc-stan.org/).
+Most of these black-box Bayesian software have R interfaces, 
+e.g. [rjags](https://cran.r-project.org/web/packages/rjags/index.html) and 
+[rstan](https://cran.r-project.org/web/packages/rstan/index.html).
